@@ -23,4 +23,8 @@ class RoomType extends Model
     {
         return $this->belongsTo(Hotel::class, 'hotel_id');
     }
+    public function inventories()
+    {
+        return $this->hasMany(RoomInventory::class, 'room_type_id');
+    }
 }
