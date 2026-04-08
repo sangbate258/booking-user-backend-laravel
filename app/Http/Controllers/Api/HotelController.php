@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use Illuminate\Support\Facades\DB;
 use App\Models\RoomType;
 use Carbon\Carbon;
 use App\Http\Controllers\Controller;
@@ -14,7 +15,11 @@ class HotelController extends Controller
     {
         $request->validate([
             'city' => 'required|string',
+            'check_in' => 'nullable|date|required_with:check_out',
+            'check_out' => 'nullable|date|after:check_in|required_with:check_in',
             'star_rating' => 'nullable|integer|min:1|max:5',
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0',
         ]);
 
         $query = Hotel::query()
@@ -23,6 +28,38 @@ class HotelController extends Controller
 
         if ($request->filled('star_rating')) {
             $query->where('star_rating', $request->star_rating);
+        }
+
+        // Nếu có check_in/check_out thì lọc thêm theo tồn kho phòng 
+        if ($request->filled('check_in') && $request->filled('check_out')) {
+            $checkIn = Carbon::parse($request->check_in);
+            $checkOut = Carbon::parse($request->check_out);
+
+            $startDate = $checkIn->toDateString();
+            $endDate = $checkOut->copy()->subDay()->toDateString(); // check_out không tính là đêm ở
+            $nights = $checkIn->diffInDays($checkOut);
+
+            $minPrice = $request->min_price;
+            $maxPrice = $request->max_price;
+
+            $query->whereExists(function ($q) use ($startDate, $endDate, $nights, $minPrice, $maxPrice) {
+                $q->select(DB::raw(1))
+                    ->from('room_types as rt')
+                    ->join('room_inventory as ri', 'ri.room_type_id', '=', 'rt.id')
+                    ->whereColumn('rt.hotel_id', 'hotels.id')
+                    ->whereBetween('ri.apply_date', [$startDate, $endDate])
+                    ->groupBy('rt.id')
+                    ->havingRaw('COUNT(*) = ?', [$nights])
+                    ->havingRaw('MIN(ri.available_allotment) >= 1');
+
+                // lọc giá đơn giản theo MIN trong khoảng ngày
+                if (!is_null($minPrice)) {
+                    $q->havingRaw('MIN(ri.price) >= ?', [$minPrice]);
+                }
+                if (!is_null($maxPrice)) {
+                    $q->havingRaw('MIN(ri.price) <= ?', [$maxPrice]);
+                }
+            });
         }
 
         $hotels = $query->with('roomTypes')->get();
