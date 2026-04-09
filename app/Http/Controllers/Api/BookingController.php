@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Payment;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\BookingDetail;
@@ -86,7 +87,13 @@ class BookingController extends Controller
                 'rooms_count' => $request->rooms_count,
                 'subtotal' => $totalAmount,
             ]);
-
+            Payment::create([
+                'booking_id' => $booking->id,
+                'transaction_id' => null,
+                'payment_method' => 4,      // 4: Cash (thanh toán tại khách sạn)
+                'amount' => $totalAmount,
+                'payment_status' => 0,      // 0: Pending
+            ]);
             foreach ($inventories as $inventory) {
                 $inventory->available_allotment -= $request->rooms_count;
                 $inventory->save();
@@ -152,6 +159,50 @@ class BookingController extends Controller
             'success' => true,
             'message' => 'Lấy chi tiết đặt phòng thành công',
             'data' => $booking
+        ]);
+    }
+    public function mockPay(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $booking = Booking::where('id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy đơn đặt phòng',
+            ], 404);
+        }
+
+        $payment = Payment::where('booking_id', $booking->id)->first();
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không tìm thấy thông tin thanh toán cho đơn này',
+            ], 404);
+        }
+
+        // mock thanh toán thành công
+        $payment->payment_status = 1; // Success
+        $payment->transaction_id = 'MOCK_' . time();
+        $payment->save();
+
+        // cập nhật đơn sang confirmed
+        $booking->status = 1; // Confirmed
+        $booking->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Thanh toán (mock) thành công',
+            'data' => [
+                'booking_id' => $booking->id,
+                'booking_status' => $booking->status,
+                'payment_status' => $payment->payment_status,
+                'transaction_id' => $payment->transaction_id,
+            ]
         ]);
     }
 }
