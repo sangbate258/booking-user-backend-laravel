@@ -15,6 +15,21 @@ class BookingController extends Controller
 {
     public function store(Request $request)
     {
+        $request->merge([
+            'room_type_id'   => $request->input('room_type_id', $request->input('room_id')),
+            'check_in_date'  => $request->input('check_in_date', $request->input('check_in')),
+            'check_out_date' => $request->input('check_out_date', $request->input('check_out')),
+            'rooms_count'    => $request->input('rooms_count', $request->input('quantity', 1)),
+            'guest_name'     => $request->input('guest_name', $request->input('customer_name')),
+            'guest_phone'    => $request->input('guest_phone', $request->input('customer_phone')),
+        ]);
+
+        if (!$request->hotel_id && $request->room_type_id) {
+            $roomTypeForHotel = RoomType::find($request->room_type_id);
+            if ($roomTypeForHotel) {
+                $request->merge(['hotel_id' => $roomTypeForHotel->hotel_id]);
+            }
+        }
         $request->validate([
             'hotel_id' => 'required|integer|exists:hotels,id',
             'room_type_id' => 'required|integer|exists:room_types,id',
@@ -159,50 +174,6 @@ class BookingController extends Controller
             'success' => true,
             'message' => 'Lấy chi tiết đặt phòng thành công',
             'data' => $booking
-        ]);
-    }
-    public function mockPay(Request $request, $id)
-    {
-        $user = $request->user();
-
-        $booking = Booking::where('id', $id)
-            ->where('user_id', $user->id)
-            ->first();
-
-        if (!$booking) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy đơn đặt phòng',
-            ], 404);
-        }
-
-        $payment = Payment::where('booking_id', $booking->id)->first();
-
-        if (!$payment) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Không tìm thấy thông tin thanh toán cho đơn này',
-            ], 404);
-        }
-
-        // mock thanh toán thành công
-        $payment->payment_status = 1; // Success
-        $payment->transaction_id = 'MOCK_' . time();
-        $payment->save();
-
-        // cập nhật đơn sang confirmed
-        $booking->status = 1; // Confirmed
-        $booking->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Thanh toán (mock) thành công',
-            'data' => [
-                'booking_id' => $booking->id,
-                'booking_status' => $booking->status,
-                'payment_status' => $payment->payment_status,
-                'transaction_id' => $payment->transaction_id,
-            ]
         ]);
     }
 }

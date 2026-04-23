@@ -14,7 +14,7 @@ class HotelController extends Controller
     public function search(Request $request)
     {
         $request->validate([
-            'city' => 'required|string',
+            'city' => 'nullable|string',
             'check_in' => 'nullable|date|required_with:check_out',
             'check_out' => 'nullable|date|after:check_in|required_with:check_in',
             'star_rating' => 'nullable|integer|min:1|max:5',
@@ -23,8 +23,11 @@ class HotelController extends Controller
         ]);
 
         $query = Hotel::query()
-            ->where('status', 1)
-            ->where('city', 'like', '%' . $request->city . '%');
+            ->where('status', 1);
+
+        if ($request->filled('city')) {
+            $query->where('city', 'like', '%' . $request->city . '%');
+        }
 
         if ($request->filled('star_rating')) {
             $query->where('star_rating', $request->star_rating);
@@ -52,7 +55,7 @@ class HotelController extends Controller
                     ->havingRaw('COUNT(*) = ?', [$nights])
                     ->havingRaw('MIN(ri.available_allotment) >= 1');
 
-                // lọc giá đơn giản theo MIN trong khoảng ngày
+                // lọc giá theo MIN trong khoảng ngày
                 if (!is_null($minPrice)) {
                     $q->havingRaw('MIN(ri.price) >= ?', [$minPrice]);
                 }

@@ -12,67 +12,75 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     public function register(Request $request)
-    {
-        $request->validate([
-            'full_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-            'phone' => 'nullable|string|max:15',
-        ]);
+{
+    $request->validate([
+        'name' => 'required|string|max:100',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|string|min:6|confirmed',
+        'phone' => 'nullable|string|max:15',
+    ]);
 
-        $user = User::create([
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'password_hash' => Hash::make($request->password),
-            'phone' => $request->phone,
-            'is_active' => 1,
-        ]);
+    $user = User::create([
+        'full_name' => $request->name,
+        'email' => $request->email,
+        'password_hash' => Hash::make($request->password),
+        'phone' => $request->phone,
+        'is_active' => 1,
+    ]);
 
-        $token = $user->createToken('user_token')->plainTextToken;
+    $token = $user->createToken('user_token')->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Đăng ký thành công',
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-            ]
-        ], 201);
-    }
+    return response()->json([
+        'success' => true,
+        'message' => 'Đăng ký thành công',
+        'data' => [
+            'user' => $user,
+            'token' => $token,
+        ],
+        'user' => $user,
+        'token' => $token,
+        'access_token' => $token,
+    ], 201);
+}
 
     public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string',
+    ]);
 
-        $user = User::where('email', $request->email)->first();
+    $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password_hash)) {
-            throw ValidationException::withMessages([
-                'email' => ['Email hoặc mật khẩu không đúng.'],
-            ]);
-        }
-
-        if (isset($user->is_active) && !$user->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tài khoản đã bị khóa',
-            ], 403);
-        }
-
-        $token = $user->createToken('user_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Đăng nhập thành công',
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-            ]
+    if (!$user || !Hash::check($request->password, $user->password_hash)) {
+        throw ValidationException::withMessages([
+            'email' => ['Email hoặc mật khẩu không đúng.'],
         ]);
     }
+
+    if (isset($user->is_active) && !$user->is_active) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Tài khoản đã bị khóa',
+        ], 403);
+    }
+
+    $token = $user->createToken('user_token')->plainTextToken;
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Đăng nhập thành công',
+        'data' => [
+            'user' => $user,
+            'token' => $token,
+        ],
+
+        
+        'user' => $user,
+        'token' => $token,
+        'access_token' => $token,
+    ]);
+}
 
     public function me(Request $request)
     {
